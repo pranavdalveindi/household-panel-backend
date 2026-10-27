@@ -1,0 +1,10 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const requireRole_1 = require("../../middleware/requireRole");
+const appointments_controller_1 = require("./appointments.controller");
+const router = (0, express_1.Router)({ mergeParams: true });
+router.get('/', appointments_controller_1.getAppointments);
+router.post('/', (0, requireRole_1.requireRole)('call_center'), appointments_controller_1.createAppointment);
+router.delete('/:appointmentId', (0, requireRole_1.requireRole)('call_center'), appointments_controller_1.deleteAppointment);
+exports.default = router;

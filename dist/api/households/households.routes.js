@@ -1,0 +1,10 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const requireRole_1 = require("../../middleware/requireRole");
+const households_controller_1 = require("./households.controller");
+const auth_1 = require("../../middleware/auth");
+const router = (0, express_1.Router)();
+router.get('/', auth_1.authenticate, households_controller_1.getHouseholds);
+router.patch('/:id', (0, requireRole_1.requireRole)('call_center', 'field_executive'), households_controller_1.patchHousehold);
+exports.default = router;
