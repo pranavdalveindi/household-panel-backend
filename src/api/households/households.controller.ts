@@ -193,84 +193,79 @@ export const patchHousehold = async (req: AuthRequest, res: Response): Promise<v
   if (role === 'call_center') {
     const { call_status, appointment_call_status } = req.body
 
+    if (call_status === undefined && appointment_call_status === undefined) {
+      res.status(400).json({ error: 'At least one of call_status or appointment_call_status must be provided' })
+      return
+    }
+
     // Fetch current call record
     const { data: currentRecord } = await supabase
       .from('household_call_records')
-      .select('call_status, appointment_call_status')
+      .select('call_status, appointment_call_status, scheduled_date')
       .eq('survey_household_id', id)
       .single()
 
-    const currentCallStatus = currentRecord?.call_status
+    let effectiveCallStatus = currentRecord?.call_status
 
-    // Gate 1: call_status
+    const now = new Date().toISOString()
+    const upsertPayload: Record<string, unknown> = {
+      survey_household_id: id,
+      processed_by: req.user!.id,
+      processed_at: now,
+      updated_at: now,
+    }
+
+    // 1. Process call_status if provided
     if (call_status !== undefined) {
-      const normalized = typeof call_status === 'string' ? call_status.trim() : ''
-      if (!CALL_STATUSES.includes(normalized)) {
+      const raw = typeof call_status === 'string' ? call_status.trim() : ''
+      const matched = CALL_STATUSES.find((s) => s.toLowerCase() === raw.toLowerCase())
+      if (!matched) {
         res.status(400).json({ error: 'Invalid call_status' })
         return
       }
+      effectiveCallStatus = matched
+      upsertPayload.call_status = matched
+    }
 
-      const { error } = await supabase
-        .from('household_call_records')
-        .upsert(
-          {
-            survey_household_id: id,
-            call_status: normalized,
-            processed_by: req.user!.id,
-            processed_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: 'survey_household_id' }
-        )
-
-      if (error) {
-        res.status(500).json({ error: error.message })
+    // 2. Process appointment_call_status based on effectiveCallStatus
+    if (effectiveCallStatus !== 'call successful') {
+      // If the call was NOT successful (e.g. Not reachable, Number does not connect):
+      // An appointment can NEVER be 'Scheduled'.
+      if (
+        typeof appointment_call_status === 'string' &&
+        appointment_call_status.trim().toLowerCase() === 'scheduled'
+      ) {
+        res.status(400).json({ error: 'Call must be successful before setting appointment status to Scheduled' })
         return
+      }
+
+      // When call is not successful, appointment status is automatically Rejected and scheduled_date is cleared
+      upsertPayload.appointment_call_status = 'Rejected'
+      upsertPayload.scheduled_date = null
+    } else {
+      // Call IS successful
+      if (appointment_call_status !== undefined && appointment_call_status !== null && appointment_call_status !== '') {
+        const raw = typeof appointment_call_status === 'string' ? appointment_call_status.trim() : ''
+        const matchedAppt = APPOINTMENT_CALL_STATUSES.find((s) => s.toLowerCase() === raw.toLowerCase())
+        if (!matchedAppt) {
+          res.status(400).json({ error: 'Invalid appointment_call_status' })
+          return
+        }
+        upsertPayload.appointment_call_status = matchedAppt
+        if (matchedAppt === 'Rejected') {
+          upsertPayload.scheduled_date = null
+        }
       }
     }
 
-    // Gate 2: appointment_call_status — only allowed if call was successful
-    if (appointment_call_status !== undefined) {
-      const effectiveCallStatus =
-        call_status !== undefined ? (typeof call_status === 'string' ? call_status.trim() : '') : currentCallStatus
+    const { data: updatedCall, error } = await supabase
+      .from('household_call_records')
+      .upsert(upsertPayload, { onConflict: 'survey_household_id' })
+      .select()
+      .single()
 
-      if (effectiveCallStatus !== 'call successful') {
-        res.status(400).json({ error: 'Call must be successful before setting appointment status' })
-        return
-      }
-
-      const normalized = typeof appointment_call_status === 'string' ? appointment_call_status.trim() : ''
-      if (!APPOINTMENT_CALL_STATUSES.includes(normalized)) {
-        res.status(400).json({ error: 'Invalid appointment_call_status' })
-        return
-      }
-
-      const { data: updatedCall, error } = await supabase
-        .from('household_call_records')
-        .upsert(
-          {
-            survey_household_id: id,
-            appointment_call_status: normalized,
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: 'survey_household_id' }
-        )
-        .select()
-        .single()
-
-      if (error) {
-        res.status(500).json({ error: error.message })
-        return
-      }
-
-      res.json({
-        success: true,
-        household: {
-          id,
-          call_status: effectiveCallStatus,
-          appointment_call_status: normalized,
-        },
-      })
+    if (error) {
+      res.status(500).json({ error: error.message })
       return
     }
 
@@ -278,7 +273,9 @@ export const patchHousehold = async (req: AuthRequest, res: Response): Promise<v
       success: true,
       household: {
         id,
-        call_status: call_status !== undefined ? (typeof call_status === 'string' ? call_status.trim() : call_status) : currentCallStatus,
+        call_status: updatedCall?.call_status ?? effectiveCallStatus ?? null,
+        appointment_call_status: updatedCall?.appointment_call_status ?? null,
+        scheduled_date: updatedCall?.scheduled_date ?? null,
       },
     })
     return
