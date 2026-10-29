@@ -17,6 +17,12 @@ exports.env = {
     RDS_USER: process.env.RDS_USER,
     RDS_PASSWORD: process.env.RDS_PASSWORD,
     RDS_DATABASE: process.env.RDS_DATABASE,
+    // AWS RDS Postgres
+    POSTGRES_HOST: process.env.POSTGRES_HOST,
+    POSTGRES_PORT: process.env.POSTGRES_PORT || '5432',
+    POSTGRES_USER: process.env.POSTGRES_USER,
+    POSTGRES_PASSWORD: process.env.POSTGRES_PASSWORD,
+    POSTGRES_DB: process.env.POSTGRES_DB,
 };
 // Temporary debug log: does not expose secret keys
 console.log('[SUPABASE CONFIG DEBUG]', {
