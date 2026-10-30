@@ -1,10 +1,10 @@
 -- ==============================================================================
 -- Panel Module Postgres Functions for Supabase
--- Run this script in the Supabase SQL Editor
+-- Updated to use panel_households table instead of panel_live_data
+-- Active statuses: PRODUCTION, TRAINING_1, TRAINING_2, INSTALLED
 -- ==============================================================================
 
 -- 1. get_panel_summary
--- Returns total_target, total_live, total_shortfall, and breakdowns by region, sec, and mosr
 CREATE OR REPLACE FUNCTION get_panel_summary()
 RETURNS JSONB
 LANGUAGE plpgsql
@@ -19,24 +19,29 @@ DECLARE
   v_by_mosr JSONB;
 BEGIN
   SELECT COALESCE(SUM(target_count), 0) INTO v_total_target FROM panel_master_targets;
-  SELECT COALESCE(COUNT(*), 0) INTO v_total_live FROM panel_live_data;
+
+  SELECT COALESCE(COUNT(*), 0) INTO v_total_live
+  FROM panel_households
+  WHERE current_status IN ('PRODUCTION', 'TRAINING_1', 'TRAINING_2', 'INSTALLED')
+    AND environment = 'PROD';
+
   v_total_shortfall := v_total_target - v_total_live;
 
   -- Breakdown by Region
   SELECT COALESCE(jsonb_agg(sub ORDER BY sub.region_code), '[]'::jsonb)
   INTO v_by_region
   FROM (
-    SELECT 
+    SELECT
       r.id AS region_id,
       r.region_code,
       r.region_name,
       COALESCE(t.target, 0) AS target,
       COALESCE(l.live, 0) AS live,
       (COALESCE(t.target, 0) - COALESCE(l.live, 0)) AS shortfall,
-      CASE 
-        WHEN COALESCE(t.target, 0) > 0 
+      CASE
+        WHEN COALESCE(t.target, 0) > 0
         THEN ROUND(((COALESCE(t.target, 0) - COALESCE(l.live, 0))::numeric / t.target) * 100, 2)
-        ELSE 0.00 
+        ELSE 0.00
       END AS shortfall_pct
     FROM regions r
     LEFT JOIN (
@@ -46,7 +51,9 @@ BEGIN
     ) t ON t.region_id = r.id
     LEFT JOIN (
       SELECT region_id, COUNT(*) AS live
-      FROM panel_live_data
+      FROM panel_households
+      WHERE current_status IN ('PRODUCTION', 'TRAINING_1', 'TRAINING_2', 'INSTALLED')
+        AND environment = 'PROD'
       GROUP BY region_id
     ) l ON l.region_id = r.id
   ) sub;
@@ -55,15 +62,15 @@ BEGIN
   SELECT COALESCE(jsonb_agg(sub ORDER BY sub.sec), '[]'::jsonb)
   INTO v_by_sec
   FROM (
-    SELECT 
+    SELECT
       s.sec,
       COALESCE(t.target, 0) AS target,
       COALESCE(l.live, 0) AS live,
       (COALESCE(t.target, 0) - COALESCE(l.live, 0)) AS shortfall,
-      CASE 
-        WHEN COALESCE(t.target, 0) > 0 
+      CASE
+        WHEN COALESCE(t.target, 0) > 0
         THEN ROUND(((COALESCE(t.target, 0) - COALESCE(l.live, 0))::numeric / t.target) * 100, 2)
-        ELSE 0.00 
+        ELSE 0.00
       END AS shortfall_pct
     FROM (SELECT generate_series(1, 5) AS sec) s
     LEFT JOIN (
@@ -73,8 +80,10 @@ BEGIN
     ) t ON t.sec = s.sec
     LEFT JOIN (
       SELECT sec, COUNT(*) AS live
-      FROM panel_live_data
+      FROM panel_households
       WHERE sec IS NOT NULL
+        AND current_status IN ('PRODUCTION', 'TRAINING_1', 'TRAINING_2', 'INSTALLED')
+        AND environment = 'PROD'
       GROUP BY sec
     ) l ON l.sec = s.sec
   ) sub;
@@ -83,15 +92,15 @@ BEGIN
   SELECT COALESCE(jsonb_agg(sub ORDER BY sub.mosr), '[]'::jsonb)
   INTO v_by_mosr
   FROM (
-    SELECT 
+    SELECT
       m.mosr,
       COALESCE(t.target, 0) AS target,
       COALESCE(l.live, 0) AS live,
       (COALESCE(t.target, 0) - COALESCE(l.live, 0)) AS shortfall,
-      CASE 
-        WHEN COALESCE(t.target, 0) > 0 
+      CASE
+        WHEN COALESCE(t.target, 0) > 0
         THEN ROUND(((COALESCE(t.target, 0) - COALESCE(l.live, 0))::numeric / t.target) * 100, 2)
-        ELSE 0.00 
+        ELSE 0.00
       END AS shortfall_pct
     FROM (SELECT generate_series(1, 6) AS mosr) m
     LEFT JOIN (
@@ -101,8 +110,10 @@ BEGIN
     ) t ON t.mosr = m.mosr
     LEFT JOIN (
       SELECT mosr, COUNT(*) AS live
-      FROM panel_live_data
+      FROM panel_households
       WHERE mosr IS NOT NULL
+        AND current_status IN ('PRODUCTION', 'TRAINING_1', 'TRAINING_2', 'INSTALLED')
+        AND environment = 'PROD'
       GROUP BY mosr
     ) l ON l.mosr = m.mosr
   ) sub;
@@ -120,7 +131,6 @@ $$;
 
 
 -- 2. get_panel_heatmap
--- Returns a flat array of SEC × MOSR cells across all regions
 CREATE OR REPLACE FUNCTION get_panel_heatmap()
 RETURNS JSONB
 LANGUAGE plpgsql
@@ -132,16 +142,16 @@ BEGIN
   SELECT COALESCE(jsonb_agg(sub ORDER BY sub.sec, sub.mosr), '[]'::jsonb)
   INTO v_cells
   FROM (
-    SELECT 
+    SELECT
       grid.sec,
       grid.mosr,
       COALESCE(t.target, 0) AS target,
       COALESCE(l.live, 0) AS live,
       (COALESCE(t.target, 0) - COALESCE(l.live, 0)) AS shortfall,
-      CASE 
-        WHEN COALESCE(t.target, 0) > 0 
+      CASE
+        WHEN COALESCE(t.target, 0) > 0
         THEN ROUND(((COALESCE(t.target, 0) - COALESCE(l.live, 0))::numeric / t.target) * 100, 2)
-        ELSE 0.00 
+        ELSE 0.00
       END AS shortfall_pct
     FROM (
       SELECT s.sec, m.mosr
@@ -155,8 +165,11 @@ BEGIN
     ) t ON t.sec = grid.sec AND t.mosr = grid.mosr
     LEFT JOIN (
       SELECT sec, mosr, COUNT(*) AS live
-      FROM panel_live_data
-      WHERE sec IS NOT NULL AND mosr IS NOT NULL
+      FROM panel_households
+      WHERE sec IS NOT NULL
+        AND mosr IS NOT NULL
+        AND current_status IN ('PRODUCTION', 'TRAINING_1', 'TRAINING_2', 'INSTALLED')
+        AND environment = 'PROD'
       GROUP BY sec, mosr
     ) l ON l.sec = grid.sec AND l.mosr = grid.mosr
   ) sub;
@@ -167,7 +180,6 @@ $$;
 
 
 -- 3. get_panel_region_breakdown
--- Returns the full SEC × MOSR breakdown for a single region
 CREATE OR REPLACE FUNCTION get_panel_region_breakdown(p_region_code INT)
 RETURNS JSONB
 LANGUAGE plpgsql
@@ -196,24 +208,26 @@ BEGIN
 
   SELECT COALESCE(COUNT(*), 0)
   INTO v_total_live
-  FROM panel_live_data
-  WHERE region_id = v_region.id;
+  FROM panel_households
+  WHERE region_id = v_region.id
+    AND current_status IN ('PRODUCTION', 'TRAINING_1', 'TRAINING_2', 'INSTALLED')
+    AND UPPER(TRIM(environment)) = 'PROD';
 
   v_total_shortfall := v_total_target - v_total_live;
 
   SELECT COALESCE(jsonb_agg(sub ORDER BY sub.sec, sub.mosr), '[]'::jsonb)
   INTO v_cells
   FROM (
-    SELECT 
+    SELECT
       grid.sec,
       grid.mosr,
       COALESCE(t.target, 0) AS target,
       COALESCE(l.live, 0) AS live,
       (COALESCE(t.target, 0) - COALESCE(l.live, 0)) AS shortfall,
-      CASE 
-        WHEN COALESCE(t.target, 0) > 0 
+      CASE
+        WHEN COALESCE(t.target, 0) > 0
         THEN ROUND(((COALESCE(t.target, 0) - COALESCE(l.live, 0))::numeric / t.target) * 100, 2)
-        ELSE 0.00 
+        ELSE 0.00
       END AS shortfall_pct
     FROM (
       SELECT s.sec, m.mosr
@@ -222,14 +236,18 @@ BEGIN
     ) grid
     LEFT JOIN (
       SELECT sec, mosr, SUM(target_count) AS target
-      FROM panel_master_targets
+      FROM panel_master_targets                    -- ← this FROM was missing
       WHERE region_id = v_region.id
       GROUP BY sec, mosr
     ) t ON t.sec = grid.sec AND t.mosr = grid.mosr
     LEFT JOIN (
       SELECT sec, mosr, COUNT(*) AS live
-      FROM panel_live_data
-      WHERE region_id = v_region.id AND sec IS NOT NULL AND mosr IS NOT NULL
+      FROM panel_households
+      WHERE region_id = v_region.id
+        AND sec IS NOT NULL
+        AND mosr IS NOT NULL
+        AND current_status IN ('PRODUCTION', 'TRAINING_1', 'TRAINING_2', 'INSTALLED')
+        AND UPPER(TRIM(environment)) = 'PROD'
       GROUP BY sec, mosr
     ) l ON l.sec = grid.sec AND l.mosr = grid.mosr
   ) sub;
@@ -246,9 +264,7 @@ BEGIN
 END;
 $$;
 
-
 -- 4. get_panel_unclassified
--- Returns all live data rows where sec IS NULL or mosr IS NULL, with their hhid and region_name, plus a total count
 CREATE OR REPLACE FUNCTION get_panel_unclassified()
 RETURNS JSONB
 LANGUAGE plpgsql
@@ -260,25 +276,30 @@ DECLARE
 BEGIN
   SELECT COUNT(*)
   INTO v_total
-  FROM panel_live_data
-  WHERE sec IS NULL OR mosr IS NULL;
+  FROM panel_households
+  WHERE (sec IS NULL OR mosr IS NULL)
+    AND current_status IN ('PRODUCTION', 'TRAINING_1', 'TRAINING_2', 'INSTALLED')
+    AND environment = 'PROD';
 
   SELECT COALESCE(jsonb_agg(sub), '[]'::jsonb)
   INTO v_rows
   FROM (
-    SELECT 
-      pld.id,
-      pld.hhid,
-      pld.region_id,
+    SELECT
+      ph.id,
+      ph.hhid,
+      ph.region_id,
       r.region_code,
       r.region_name,
-      pld.sec,
-      pld.mosr,
-      pld.created_at
-    FROM panel_live_data pld
-    LEFT JOIN regions r ON r.id = pld.region_id
-    WHERE pld.sec IS NULL OR pld.mosr IS NULL
-    ORDER BY pld.created_at DESC, pld.hhid ASC
+      ph.sec,
+      ph.mosr,
+      ph.current_status,
+      ph.created_at
+    FROM panel_households ph
+    LEFT JOIN regions r ON r.id = ph.region_id
+    WHERE (ph.sec IS NULL OR ph.mosr IS NULL)
+      AND ph.current_status IN ('PRODUCTION', 'TRAINING_1', 'TRAINING_2', 'INSTALLED')
+      AND ph.environment = 'PROD'
+    ORDER BY ph.created_at DESC, ph.hhid ASC
   ) sub;
 
   RETURN jsonb_build_object(
@@ -289,4 +310,3 @@ BEGIN
   );
 END;
 $$;
-
