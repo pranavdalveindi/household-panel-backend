@@ -4,6 +4,7 @@ import {
   getPanelHeatmap,
   getPanelRegion,
   getPanelUnclassified,
+  getPanelUpdates,
 } from './panel.controller'
 
 const router = Router()
@@ -13,6 +14,7 @@ router.get('/summary', getPanelSummary)
 router.get('/heatmap', getPanelHeatmap)
 router.get('/region/:regionCode', getPanelRegion)
 router.get('/unclassified', getPanelUnclassified)
+router.get('/updates', getPanelUpdates)
 
 export default router
 

@@ -8,4 +8,5 @@ router.get('/summary', panel_controller_1.getPanelSummary);
 router.get('/heatmap', panel_controller_1.getPanelHeatmap);
 router.get('/region/:regionCode', panel_controller_1.getPanelRegion);
 router.get('/unclassified', panel_controller_1.getPanelUnclassified);
+router.get('/updates', panel_controller_1.getPanelUpdates);
 exports.default = router;
