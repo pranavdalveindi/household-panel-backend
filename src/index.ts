@@ -5,9 +5,6 @@ import helmet from 'helmet'
 import { env } from './config/env'
 import { authenticate } from './middleware/auth'
 import authRouter from './api/auth/auth.routes'
-import householdsRouter from './api/households/households.routes'
-import appointmentsRouter from './api/appointments/appointments.routes'
-import adminUsersRouter from './api/admin/users/users.routes'
 import panelRouter from './api/panel/panel.routes'
 
 const app = express()
@@ -43,12 +40,8 @@ app.use(express.json())
 app.get('/health', (_, res) => res.json({ status: 'ok' }))
 app.use('/api/auth', authRouter)
 
-// All routes below require authentication
+// Authenticated Panel routes (Served via RDS in Prod or Supabase in Dev)
 app.use(authenticate)
-
-app.use('/api/households', householdsRouter)
-app.use('/api/households/:id/appointments', appointmentsRouter)
-app.use('/api/admin/users', adminUsersRouter)
 app.use('/api/panel', panelRouter)
 
 app.listen(env.PORT, () => {

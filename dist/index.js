@@ -10,9 +10,6 @@ const helmet_1 = __importDefault(require("helmet"));
 const env_1 = require("./config/env");
 const auth_1 = require("./middleware/auth");
 const auth_routes_1 = __importDefault(require("./api/auth/auth.routes"));
-const households_routes_1 = __importDefault(require("./api/households/households.routes"));
-const appointments_routes_1 = __importDefault(require("./api/appointments/appointments.routes"));
-const users_routes_1 = __importDefault(require("./api/admin/users/users.routes"));
 const panel_routes_1 = __importDefault(require("./api/panel/panel.routes"));
 const app = (0, express_1.default)();
 app.use((0, helmet_1.default)());
@@ -40,11 +37,8 @@ app.use(express_1.default.json());
 // Public routes
 app.get('/health', (_, res) => res.json({ status: 'ok' }));
 app.use('/api/auth', auth_routes_1.default);
-// All routes below require authentication
+// Authenticated Panel routes (Served via RDS in Prod or Supabase in Dev)
 app.use(auth_1.authenticate);
-app.use('/api/households', households_routes_1.default);
-app.use('/api/households/:id/appointments', appointments_routes_1.default);
-app.use('/api/admin/users', users_routes_1.default);
 app.use('/api/panel', panel_routes_1.default);
 app.listen(env_1.env.PORT, () => {
     console.log(`API running on port ${env_1.env.PORT}`);
