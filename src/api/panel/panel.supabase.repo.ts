@@ -392,12 +392,11 @@ export class PanelSupabaseRepository implements IPanelRepository {
 
     const AGE_BUCKETS = [
       { label: '0-14', min: 0, max: 14 },
-      { label: '15-24', min: 15, max: 24 },
-      { label: '25-34', min: 25, max: 34 },
-      { label: '35-44', min: 35, max: 44 },
-      { label: '45-54', min: 45, max: 54 },
-      { label: '55-64', min: 55, max: 64 },
-      { label: '65+', min: 65, max: 150 },
+      { label: '15-30', min: 15, max: 30 },
+      { label: '30-39', min: 31, max: 39 },
+      { label: '40-49', min: 40, max: 49 },
+      { label: '50-60', min: 50, max: 60 },
+      { label: '60+', min: 61, max: 150 },
     ]
 
     const ageGroups = AGE_BUCKETS.map((b) => {
