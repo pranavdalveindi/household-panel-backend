@@ -1,5 +1,5 @@
--- Panel lifecycle / rejection audit
--- Run this in Supabase SQL editor or apply it as a migration.
+-- Panel lifecycle / retired households audit
+-- Run this in PostgreSQL / Supabase SQL editor or apply it as a migration.
 
 -- 1) Ensure panel_updates table exists
 CREATE TABLE IF NOT EXISTS public.panel_updates (
@@ -13,8 +13,6 @@ CREATE TABLE IF NOT EXISTS public.panel_updates (
   sec integer,
   environment text,
   is_rejected boolean NOT NULL DEFAULT false,
-  sla_deadline timestamptz,
-  sla_breached boolean NOT NULL DEFAULT false,
   recorded_at timestamptz NOT NULL DEFAULT now()
 );
 
@@ -25,7 +23,7 @@ CREATE INDEX IF NOT EXISTS idx_panel_updates_recorded_at
 CREATE INDEX IF NOT EXISTS idx_panel_updates_hhid
   ON public.panel_updates (hhid);
 
--- 2) Write a lifecycle update every time a household is moved to UNASSIGNED or DEINSTALLED
+-- 2) Write a lifecycle update every time a household is moved to RETIRED
 CREATE OR REPLACE FUNCTION public.log_panel_lifecycle_update()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -37,20 +35,10 @@ DECLARE
   v_mos integer;
   v_sec integer;
   v_environment text;
-  v_sla_deadline timestamptz;
 BEGIN
-  -- Log on transition to UNASSIGNED (SLA: 3 days → DEINSTALLED)
-  -- Log on transition to DEINSTALLED (SLA: 30 days → RETIRED)
-  -- Log on transition to RETIRED (no SLA)
-  IF NEW.current_status IN ('UNASSIGNED', 'DEINSTALLED', 'RETIRED')
+  -- Log strictly on transition to RETIRED
+  IF NEW.current_status = 'RETIRED'
      AND (OLD.current_status IS DISTINCT FROM NEW.current_status) THEN
-
-    -- Determine SLA deadline based on new status
-    v_sla_deadline := CASE
-      WHEN NEW.current_status = 'UNASSIGNED'  THEN NOW() + INTERVAL '3 days'
-      WHEN NEW.current_status = 'DEINSTALLED' THEN NOW() + INTERVAL '30 days'
-      ELSE NULL
-    END;
 
     SELECT
       ph.region_id,
@@ -75,8 +63,6 @@ BEGIN
       sec,
       environment,
       is_rejected,
-      sla_deadline,
-      sla_breached,
       recorded_at
     )
     VALUES (
@@ -89,8 +75,6 @@ BEGIN
       v_sec,
       COALESCE(v_environment, 'PROD'),
       false,
-      v_sla_deadline,
-      false,
       NOW()
     );
   END IF;
@@ -99,7 +83,7 @@ BEGIN
 END;
 $$;
 
--- Drop old trigger if it exists, replace with unified lifecycle trigger
+-- Drop old trigger if it exists, replace with retired lifecycle trigger
 DROP TRIGGER IF EXISTS trg_panel_households_deinstalled_log ON public.panel_households;
 DROP TRIGGER IF EXISTS trg_panel_households_lifecycle_log ON public.panel_households;
 
@@ -108,7 +92,7 @@ AFTER UPDATE OF current_status
 ON public.panel_households
 FOR EACH ROW
 WHEN (
-  NEW.current_status IN ('UNASSIGNED', 'DEINSTALLED', 'RETIRED')
+  NEW.current_status = 'RETIRED'
   AND (OLD.current_status IS DISTINCT FROM NEW.current_status)
 )
 EXECUTE FUNCTION public.log_panel_lifecycle_update();

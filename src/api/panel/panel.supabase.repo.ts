@@ -262,7 +262,7 @@ export class PanelSupabaseRepository implements IPanelRepository {
   async getUpdates(): Promise<UpdatesResult> {
     const { data: updates, error: updatesError } = await supabase
       .from('panel_updates')
-      .select('id, household_id, hhid, region_id, current_status, mos, sec, environment, is_rejected, sla_deadline, sla_breached, recorded_at')
+      .select('id, household_id, hhid, region_id, current_status, mos, sec, environment, is_rejected, recorded_at')
       .order('recorded_at', { ascending: false })
 
     if (updatesError) {

@@ -101,10 +101,7 @@ export interface PanelUpdateRow {
   sec?: number | null
   environment?: string | null
   is_rejected?: boolean
-  sla_deadline?: string | Date | null
-  sla_breached?: boolean
   recorded_at: string | Date
-  is_recovered?: boolean
   member_count: number
   members: PanelUpdateMember[]
 }

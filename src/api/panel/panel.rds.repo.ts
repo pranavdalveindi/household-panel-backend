@@ -232,10 +232,7 @@ export class PanelRdsRepository implements IPanelRepository {
         sec, 
         environment, 
         is_rejected, 
-        sla_deadline, 
-        sla_breached, 
-        recorded_at, 
-        is_recovered
+        recorded_at
       FROM panel_updates
       ORDER BY recorded_at DESC
     `)
@@ -273,10 +270,7 @@ export class PanelRdsRepository implements IPanelRepository {
         sec: update.sec != null ? Number(update.sec) : null,
         environment: update.environment,
         is_rejected: update.is_rejected ?? false,
-        sla_deadline: update.sla_deadline,
-        sla_breached: update.sla_breached ?? false,
         recorded_at: update.recorded_at,
-        is_recovered: update.is_recovered ?? false,
         member_count: members.length,
         members,
       }
