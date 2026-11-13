@@ -11,6 +11,7 @@ const env_1 = require("./config/env");
 const auth_1 = require("./middleware/auth");
 const auth_routes_1 = __importDefault(require("./api/auth/auth.routes"));
 const panel_routes_1 = __importDefault(require("./api/panel/panel.routes"));
+const users_routes_1 = __importDefault(require("./api/admin/users/users.routes"));
 const app = (0, express_1.default)();
 app.use((0, helmet_1.default)());
 // Allow requests from frontend running on localhost:3000, 3001, 127.0.0.1, or configured ALLOWED_ORIGIN
@@ -40,6 +41,7 @@ app.use('/api/auth', auth_routes_1.default);
 // Authenticated Panel routes (Served via RDS in Prod or Supabase in Dev)
 app.use(auth_1.authenticate);
 app.use('/api/panel', panel_routes_1.default);
+app.use('/api/admin/users', users_routes_1.default);
 app.listen(env_1.env.PORT, () => {
     console.log(`API running on port ${env_1.env.PORT}`);
 });

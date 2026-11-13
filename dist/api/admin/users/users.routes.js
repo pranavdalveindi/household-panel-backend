@@ -7,6 +7,7 @@ const router = (0, express_1.Router)();
 router.use((0, requireRole_1.requireRole)('admin'));
 router.get('/', users_controller_1.listUsers);
 router.post('/', users_controller_1.createUser);
+router.patch('/:userId/status', users_controller_1.updateUserStatus);
 router.patch('/:userId', users_controller_1.updateUserRole);
 router.delete('/:userId', users_controller_1.deleteUser);
 exports.default = router;

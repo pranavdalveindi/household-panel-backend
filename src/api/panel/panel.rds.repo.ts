@@ -312,7 +312,7 @@ export class PanelRdsRepository implements IPanelRepository {
     const malePct = totalMembers > 0 ? Number(((maleCount / totalMembers) * 100).toFixed(1)) : 0
     const femalePct = totalMembers > 0 ? Number(((femaleCount / totalMembers) * 100).toFixed(1)) : 0
 
-    // Age groups (requested ranges: 0-14, 15-30, 30-39, 40-49, 50-60, 60+)
+    // Age groups (requested ranges: 1-14, 15-30, 30-39, 40-49, 50-60, 60+)
     const AGE_BUCKETS = [
       { label: '0-14', min: 0, max: 14 },
       { label: '15-30', min: 15, max: 30 },

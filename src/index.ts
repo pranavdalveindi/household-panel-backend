@@ -6,6 +6,7 @@ import { env } from './config/env'
 import { authenticate } from './middleware/auth'
 import authRouter from './api/auth/auth.routes'
 import panelRouter from './api/panel/panel.routes'
+import usersRouter from './api/admin/users/users.routes'
 
 const app = express()
 
@@ -43,6 +44,7 @@ app.use('/api/auth', authRouter)
 // Authenticated Panel routes (Served via RDS in Prod or Supabase in Dev)
 app.use(authenticate)
 app.use('/api/panel', panelRouter)
+app.use('/api/admin/users', usersRouter)
 
 app.listen(env.PORT, () => {
   console.log(`API running on port ${env.PORT}`)
