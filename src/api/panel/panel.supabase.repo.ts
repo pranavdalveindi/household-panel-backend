@@ -3,10 +3,12 @@ import { IPanelRepository } from './panel.repository.interface'
 import {
   PanelSummary,
   HeatmapCell,
+  HeatmapResult,
   PanelRegionMatrix,
   UnclassifiedResult,
   UpdatesResult,
   DemographicsSummary,
+  ViewershipSummary,
 } from './panel.types'
 
 const getAgeFromDob = (dob?: string | null): number | null => {
@@ -50,27 +52,35 @@ export class PanelSupabaseRepository implements IPanelRepository {
 
     const households = householdsData ?? []
 
-    const prodHouseholds = households.filter(
-      (h) => h.current_status === 'PRODUCTION' && (h.environment ? h.environment.trim().toUpperCase() === 'PROD' : true)
+    const isProdEnv = (h: { environment?: string | null }) =>
+      h.environment ? h.environment.trim().toUpperCase() === 'PROD' : true
+
+    const prodHouseholds = households.filter((h) => h.current_status === 'PRODUCTION' && isProdEnv(h))
+    const installedHouseholds = households.filter((h) => h.current_status === 'INSTALLED' && isProdEnv(h))
+    const trainingHouseholds = households.filter(
+      (h) => (h.current_status === 'TRAINING_1' || h.current_status === 'TRAINING_2') && isProdEnv(h)
     )
-    const installedCount = households.filter(
-      (h) => h.current_status === 'INSTALLED' && (h.environment ? h.environment.trim().toUpperCase() === 'PROD' : true)
-    ).length
-    const trainingCount = households.filter(
+
+    const productionCount = prodHouseholds.length
+    const installedCount = installedHouseholds.length
+    const trainingCount = trainingHouseholds.length
+
+    // Active households considered for table & quotas: PROD environment, status in (INSTALLED, PRODUCTION, TRAINING_1, TRAINING_2)
+    const activeHouseholds = households.filter(
       (h) =>
-        (h.current_status === 'TRAINING_1' || h.current_status === 'TRAINING_2') &&
-        (h.environment ? h.environment.trim().toUpperCase() === 'PROD' : true)
-    ).length
+        ['INSTALLED', 'PRODUCTION', 'TRAINING_1', 'TRAINING_2'].includes(h.current_status) &&
+        isProdEnv(h)
+    )
 
     const totalTarget = targets.reduce((sum, t) => sum + (Number(t.target_count) || 0), 0)
-    const totalLive = prodHouseholds.length
+    const totalLive = activeHouseholds.length
     const totalShortfall = Math.max(0, totalTarget - totalLive)
 
     const byRegion = regions.map((r, idx) => {
       const regTargets = targets.filter((t) => t.region_id === r.id)
-      const regProd = prodHouseholds.filter((h) => h.region_id === r.id)
+      const regActive = activeHouseholds.filter((h) => h.region_id === r.id)
       const target = regTargets.reduce((sum, t) => sum + (Number(t.target_count) || 0), 0)
-      const live = regProd.length
+      const live = regActive.length
       const shortfall = Math.max(0, target - live)
       const shortfall_pct = target > 0 ? Number(((shortfall / target) * 100).toFixed(2)) : 0
 
@@ -87,9 +97,9 @@ export class PanelSupabaseRepository implements IPanelRepository {
 
     const matrix: PanelRegionMatrix[] = regions.map((r, idx) => {
       const regTargets = targets.filter((t) => t.region_id === r.id)
-      const regProd = prodHouseholds.filter((h) => h.region_id === r.id)
+      const regActive = activeHouseholds.filter((h) => h.region_id === r.id)
       const total_target = regTargets.reduce((sum, t) => sum + (Number(t.target_count) || 0), 0)
-      const total_live = regProd.length
+      const total_live = regActive.length
 
       const cells = []
       for (let sec = 1; sec <= 3; sec++) {
@@ -97,8 +107,14 @@ export class PanelSupabaseRepository implements IPanelRepository {
           const cellTarget = regTargets
             .filter((t) => Number(t.sec) === sec && Number(t.mosr) === mosr)
             .reduce((sum, t) => sum + (Number(t.target_count) || 0), 0)
-          const cellLive = regProd.filter(
+          const inCell = regActive.filter(
             (h) => Number(h.sec_mapped) === sec && Number(h.mos_mapped) === mosr
+          )
+          const cellLive = inCell.length
+          const cellProd = inCell.filter((h) => h.current_status === 'PRODUCTION').length
+          const cellInst = inCell.filter((h) => h.current_status === 'INSTALLED').length
+          const cellTrain = inCell.filter(
+            (h) => h.current_status === 'TRAINING_1' || h.current_status === 'TRAINING_2'
           ).length
 
           cells.push({
@@ -107,6 +123,9 @@ export class PanelSupabaseRepository implements IPanelRepository {
             target: cellTarget,
             live: cellLive,
             shortfall: Math.max(0, cellTarget - cellLive),
+            production: cellProd,
+            installed: cellInst,
+            training: cellTrain,
           })
         }
       }
@@ -126,7 +145,7 @@ export class PanelSupabaseRepository implements IPanelRepository {
       const target = targets
         .filter((t) => Number(t.sec) === sec)
         .reduce((sum, t) => sum + (Number(t.target_count) || 0), 0)
-      const live = prodHouseholds.filter((h) => Number(h.sec_mapped) === sec).length
+      const live = activeHouseholds.filter((h) => Number(h.sec_mapped) === sec).length
       const shortfall = Math.max(0, target - live)
       const shortfall_pct = target > 0 ? Number(((shortfall / target) * 100).toFixed(2)) : 0
       return { sec, target, live, shortfall, shortfall_pct }
@@ -136,7 +155,7 @@ export class PanelSupabaseRepository implements IPanelRepository {
       const target = targets
         .filter((t) => Number(t.mosr) === mosr)
         .reduce((sum, t) => sum + (Number(t.target_count) || 0), 0)
-      const live = prodHouseholds.filter((h) => Number(h.mos_mapped) === mosr).length
+      const live = activeHouseholds.filter((h) => Number(h.mos_mapped) === mosr).length
       const shortfall = Math.max(0, target - live)
       const shortfall_pct = target > 0 ? Number(((shortfall / target) * 100).toFixed(2)) : 0
       return { mosr, target, live, shortfall, shortfall_pct }
@@ -146,7 +165,7 @@ export class PanelSupabaseRepository implements IPanelRepository {
       total_target: totalTarget,
       total_live: totalLive,
       total_shortfall: totalShortfall,
-      production_count: totalLive,
+      production_count: productionCount,
       installed_count: installedCount,
       training_count: trainingCount,
       by_region: byRegion,
@@ -169,16 +188,7 @@ export class PanelSupabaseRepository implements IPanelRepository {
     return this.fetchDirectSummary()
   }
 
-  async getHeatmap(): Promise<HeatmapCell[]> {
-    try {
-      const { data, error } = await supabase.rpc('get_panel_heatmap')
-      if (!error && Array.isArray(data) && data.length > 0) {
-        return data as HeatmapCell[]
-      }
-    } catch {
-      // Fall through to fallback calculation
-    }
-
+  async getHeatmap(): Promise<HeatmapResult> {
     const summary = await this.fetchDirectSummary()
     const heatmapCells: HeatmapCell[] = []
 
@@ -195,11 +205,30 @@ export class PanelSupabaseRepository implements IPanelRepository {
         }
         const shortfall = Math.max(0, target - live)
         const shortfall_pct = target > 0 ? Number(((shortfall / target) * 100).toFixed(2)) : 0
-        heatmapCells.push({ sec, mosr, target, live, shortfall, shortfall_pct })
+        heatmapCells.push({
+          sec,
+          mosr,
+          target,
+          production: live,
+          installed: 0,
+          training: 0,
+          total: live,
+          live,
+          shortfall,
+          shortfall_pct,
+          households: [],
+        })
       }
     }
 
-    return heatmapCells
+    return {
+      cells: heatmapCells,
+      pipeline: {
+        installed_no_sec: 0,
+        training_no_sec: 0,
+        observation: 0,
+      },
+    }
   }
 
   async getRegion(regionCodeOrName: string | number): Promise<PanelRegionMatrix | null> {
@@ -438,5 +467,24 @@ export class PanelSupabaseRepository implements IPanelRepository {
       members: mappedMembers,
     }
   }
+
+  async getViewership(timeWindow = '24h', _bypassCache = false): Promise<ViewershipSummary> {
+    return {
+      total_production_households: 0,
+      positive_viewership_count: 0,
+      negative_viewership_count: 0,
+      positive_pct: 0,
+      image_positive_count: 0,
+      audio_positive_count: 0,
+      dual_positive_count: 0,
+      time_window: timeWindow,
+      from_timestamp: 0,
+      to_timestamp: 0,
+      regional_breakdown: [],
+      top_channels: [],
+      households: [],
+    }
+  }
 }
+
 

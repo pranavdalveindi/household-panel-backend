@@ -6,6 +6,7 @@ import {
   getPanelUnclassified,
   getPanelUpdates,
   getPanelDemographics,
+  getPanelViewership,
 } from './panel.controller'
 
 const router = Router()
@@ -17,6 +18,7 @@ router.get('/region/:regionCode', getPanelRegion)
 router.get('/unclassified', getPanelUnclassified)
 router.get('/updates', getPanelUpdates)
 router.get('/demographics', getPanelDemographics)
+router.get('/viewership', getPanelViewership)
 
 export default router
 

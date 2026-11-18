@@ -34,9 +34,14 @@ export async function login(req: Request, res: Response): Promise<void> {
       return
     }
 
+    const sessionStart = Date.now()
+    const sessionExpiresAt = sessionStart + 2 * 60 * 60 * 1000 // 2 hours in ms
+
     res.json({
       access_token: data.session?.access_token,
       refresh_token: data.session?.refresh_token,
+      session_start: sessionStart,
+      session_expires_at: sessionExpiresAt,
       session: data.session,
       user: data.user,
     })
@@ -65,9 +70,28 @@ export async function refresh(req: Request, res: Response): Promise<void> {
       return
     }
 
+    // Enforce 2-hour absolute session timeout from user's last login
+    const ABSOLUTE_TIMEOUT_MS = 2 * 60 * 60 * 1000 // 2 hours
+    const lastSignIn = data.session.user?.last_sign_in_at
+    if (lastSignIn) {
+      const sessionAge = Date.now() - new Date(lastSignIn).getTime()
+      if (sessionAge >= ABSOLUTE_TIMEOUT_MS) {
+        res.status(401).json({
+          error: 'Absolute session timeout (2 hours) reached. Please log in again.',
+          code: 'SESSION_TIMEOUT',
+        })
+        return
+      }
+    }
+
+    const sessionExpiresAt = lastSignIn
+      ? new Date(lastSignIn).getTime() + ABSOLUTE_TIMEOUT_MS
+      : Date.now() + ABSOLUTE_TIMEOUT_MS
+
     res.json({
       access_token: data.session.access_token,
       refresh_token: data.session.refresh_token,
+      session_expires_at: sessionExpiresAt,
       session: data.session,
       user: data.user,
     })

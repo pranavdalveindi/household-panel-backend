@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getPanelDemographics = exports.getPanelUpdates = exports.getPanelUnclassified = exports.getPanelRegion = exports.getPanelHeatmap = exports.getPanelSummary = void 0;
+exports.getPanelViewership = exports.getPanelDemographics = exports.getPanelUpdates = exports.getPanelUnclassified = exports.getPanelRegion = exports.getPanelHeatmap = exports.getPanelSummary = void 0;
 const panel_repository_1 = require("./panel.repository");
 /**
  * GET /api/panel/summary
@@ -116,3 +116,27 @@ const getPanelDemographics = async (req, res) => {
     }
 };
 exports.getPanelDemographics = getPanelDemographics;
+/**
+ * GET /api/panel/viewership
+ * Returns image and audio viewership statuses for PRODUCTION households.
+ * Query params:
+ *   - window: '24h' | '7d' | '30d' | 'all' (default: '24h')
+ *   - refresh: 'true' | 'false' (bypass cache)
+ */
+const getPanelViewership = async (req, res) => {
+    try {
+        const { repo, source } = (0, panel_repository_1.getPanelRepositoryWithSource)(req);
+        const windowParam = typeof req.query.window === 'string' ? req.query.window : '24h';
+        const refreshParam = req.query.refresh === 'true';
+        console.log(`[Panel API] /viewership served from: ${source} (window=${windowParam}, refresh=${refreshParam})`);
+        res.setHeader('x-data-source', source);
+        const data = await repo.getViewership(windowParam, refreshParam);
+        res.json(data);
+    }
+    catch (err) {
+        const message = err instanceof Error ? err.message : 'Unknown error';
+        console.error('[Panel API] /viewership error:', message);
+        res.status(500).json({ error: 'Failed to fetch panel viewership', details: message });
+    }
+};
+exports.getPanelViewership = getPanelViewership;

@@ -10,4 +10,5 @@ router.get('/region/:regionCode', panel_controller_1.getPanelRegion);
 router.get('/unclassified', panel_controller_1.getPanelUnclassified);
 router.get('/updates', panel_controller_1.getPanelUpdates);
 router.get('/demographics', panel_controller_1.getPanelDemographics);
+router.get('/viewership', panel_controller_1.getPanelViewership);
 exports.default = router;

@@ -4,6 +4,9 @@ export interface PanelCell {
   target: number
   live: number
   shortfall: number
+  production?: number
+  installed?: number
+  training?: number
 }
 
 export interface PanelRegionMatrix {
@@ -55,13 +58,35 @@ export interface PanelSummary {
   matrix: PanelRegionMatrix[]
 }
 
+export interface HeatmapCellHousehold {
+  hhid: string
+  current_status: string
+  region?: string | null
+}
+
 export interface HeatmapCell {
   sec: number
   mosr: number
   target: number
+  production: number
+  installed: number
+  training: number
+  total: number
   live: number
   shortfall: number
   shortfall_pct: number
+  households?: HeatmapCellHousehold[]
+}
+
+export interface HeatmapPipeline {
+  installed_no_sec: number
+  training_no_sec: number
+  observation: number
+}
+
+export interface HeatmapResult {
+  cells: HeatmapCell[]
+  pipeline: HeatmapPipeline
 }
 
 export interface UnclassifiedRow {
@@ -74,6 +99,8 @@ export interface UnclassifiedRow {
   sec_mapped?: number | null
   mos_mapped?: number | null
   current_status?: string | null
+  issue_type?: 'NO_SEC' | 'NO_MOSR' | 'NO_SEC_AND_MOSR'
+  description?: string
   created_at?: string | Date | null
 }
 
@@ -154,6 +181,66 @@ export interface DemographicsSummary {
   age_groups: DemographicsAgeGroup[]
   by_region: DemographicsRegion[]
   members: DemographicsMember[]
+}
+
+export interface ViewershipMember {
+  member_code?: string | null
+  gender?: string | null
+  age?: number | null
+}
+
+export interface HouseholdViewershipRow {
+  hhid: string
+  region: string
+  current_status: string
+  meter_id: string | null
+  member_count: number
+  members: ViewershipMember[]
+  has_viewership: boolean
+  image_viewership: {
+    status: 'POSITIVE' | 'NEGATIVE' | 'NO_EVENTS'
+    positive_count: number
+    total_count: number
+    latest_channel?: string | null
+    latest_ts?: number | null
+  }
+  audio_viewership: {
+    status: 'POSITIVE' | 'NEGATIVE' | 'NO_EVENTS'
+    matched_count: number
+    unmatched_count: number
+    total_count: number
+    latest_channel?: string | null
+    latest_ts?: number | null
+  }
+  top_channels: Array<{ channel: string; count: number }>
+  latest_event_ts: number | null
+}
+
+export interface ViewershipSummary {
+  total_production_households: number
+  positive_viewership_count: number
+  negative_viewership_count: number
+  positive_pct: number
+  image_positive_count: number
+  audio_positive_count: number
+  dual_positive_count: number
+  time_window: string
+  from_timestamp: number
+  to_timestamp: number
+  regional_breakdown: Array<{
+    region: string
+    total_households: number
+    positive_households: number
+    negative_households: number
+    positive_pct: number
+  }>
+  top_channels: Array<{
+    channel: string
+    count: number
+    image_count: number
+    audio_count: number
+  }>
+  households: HouseholdViewershipRow[]
 }
 
 

@@ -28,9 +28,10 @@ export const listUsers = async (req: AuthRequest, res: Response): Promise<void> 
   res.json({ users })
 }
 
+export const ALLOWED_ROLES = ['developer', 'admin'] as const
+
 export const createUser = async (req: AuthRequest, res: Response): Promise<void> => {
   const { email, password, role } = req.body
-  const ALLOWED_ROLES = ['data_team', 'call_center', 'field_executive', 'developer', 'admin']
 
   if (!email || !password || !role) {
     res.status(400).json({ error: 'email, password and role are required' })
@@ -49,7 +50,7 @@ export const createUser = async (req: AuthRequest, res: Response): Promise<void>
   }
 
   if (!ALLOWED_ROLES.includes(role)) {
-    res.status(400).json({ error: 'Invalid role' })
+    res.status(400).json({ error: 'Invalid role. Permitted roles are only: developer, admin' })
     return
   }
 
@@ -80,10 +81,9 @@ export const createUser = async (req: AuthRequest, res: Response): Promise<void>
 export const updateUserRole = async (req: AuthRequest, res: Response): Promise<void> => {
   const { userId } = req.params
   const { role } = req.body
-  const ALLOWED_ROLES = ['data_team', 'call_center', 'field_executive', 'developer', 'admin']
 
   if (!ALLOWED_ROLES.includes(role)) {
-    res.status(400).json({ error: 'Invalid role' })
+    res.status(400).json({ error: 'Invalid role. Permitted roles are only: developer, admin' })
     return
   }
 
