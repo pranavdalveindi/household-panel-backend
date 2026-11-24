@@ -24,7 +24,7 @@ export function getPanelRepositoryWithSource(req?: Request): { repo: IPanelRepos
     if (normalized === 'PROD' || normalized === 'PRODUCTION' || normalized === 'RDS') {
       return { repo: rdsRepo, source: 'RDS' }
     }
-    if (normalized === 'DEV' || normalized === 'DEVELOPMENT' || normalized === 'SUPABASE') {
+    if (normalized === 'DEV' || normalized === 'DEVELOPMENT' || normalized === 'SUPABASE') {0
       return { repo: supabaseRepo, source: 'SUPABASE' }
     }
   }
